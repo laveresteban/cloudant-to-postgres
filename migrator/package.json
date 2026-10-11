@@ -1,0 +1,25 @@
+{
+  "name": "cloudant-to-postgres-migrator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Streams documents from CouchDB/Cloudant into Postgres via the _changes feed, with checkpointed, idempotent writes.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "start": "node dist/src/index.js",
+    "seed": "node dist/src/seed.js",
+    "verify": "node dist/src/verify-cli.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.0"
+  }
+}

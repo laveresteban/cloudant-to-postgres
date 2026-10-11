@@ -1,0 +1,23 @@
+{
+  "name": "alerts-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Consumes the migrator's change feed and turns events into alerts, idempotently.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "npm --prefix ../../migrator run build && tsc -p tsconfig.json && node --test \"dist/test/*.test.js\"",
+    "start": "node dist/src/index.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.0"
+  }
+}

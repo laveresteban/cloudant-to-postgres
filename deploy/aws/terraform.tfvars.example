@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is git-ignored because it holds secrets.
+allowed_cidr  = "203.0.113.7/32"                     # your public IP: curl -s https://checkip.amazonaws.com
+couch_url     = "https://YOUR-ACCOUNT.cloudantnosqldb.appdomain.cloud"
+couch_db      = "shop"
+couch_user    = "your-cloudant-user"
+couch_password = "your-cloudant-password"
+region        = "us-east-1"

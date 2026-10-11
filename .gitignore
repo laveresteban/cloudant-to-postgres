@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+deploy/aws/.terraform/
+deploy/aws/*.tfstate
+deploy/aws/*.tfstate.backup
+deploy/aws/terraform.tfvars

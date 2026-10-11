@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live order board</title>
+  <style>
+    :root {
+      --bg: #f7f7f5; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
+      --create: #1f7a4d; --update: #2b5fb3; --delete: #b3261e; --warn: #b26a00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #151515; --card: #1f1f1e; --ink: #f0f0ec; --muted: #9a9a94; --line: #333331;
+        --create: #5fd39a; --update: #8ab4f8; --delete: #f08a84; --warn: #f0b35a;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #151515; --card: #1f1f1e; --ink: #f0f0ec; --muted: #9a9a94; --line: #333331;
+      --create: #5fd39a; --update: #8ab4f8; --delete: #f08a84; --warn: #f0b35a;
+    }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .layout { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    th { color: var(--muted); font-weight: 500; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid currentColor; }
+    .create { color: var(--create); } .update { color: var(--update); } .delete { color: var(--delete); }
+    .warn { color: var(--warn); }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+    li:last-child { border-bottom: none; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .empty { color: var(--muted); font-size: 14px; }
+    .status { font-size: 14px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Live order board</h1>
+  <p class="sub">The board is built from the change feed. Edit the source database and watch it change.</p>
+
+  <div class="layout">
+    <section class="card" aria-labelledby="board-title">
+      <h2 id="board-title">Orders <span class="meta" id="count"></span></h2>
+      <p class="status" id="stream">Connecting to the change feed…</p>
+      <table>
+        <thead>
+          <tr><th>Order</th><th>Customer</th><th>Status</th><th class="num">Total</th></tr>
+        </thead>
+        <tbody id="orders"></tbody>
+      </table>
+      <p class="empty" id="no-orders" hidden>No orders yet. Run the seed script to create some.</p>
+    </section>
+
+    <section class="card" aria-labelledby="alerts-title">
+      <h2 id="alerts-title">Alerts</h2>
+      <p class="status meta" id="alerts-status">Waiting for the alerts service…</p>
+      <ul id="alerts"></ul>
+      <h2 style="margin-top:20px">Recent changes</h2>
+      <ul id="events"></ul>
+    </section>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script>
+  const FEED_URL = window.APP_CONFIG.feedUrl;
+  const ALERTS_URL = window.APP_CONFIG.alertsUrl;
+  const MAX_EVENTS = 30;
+
+  const customers = new Map(); // customer id -> name
+  const orders = new Map();    // order id -> latest body
+  const $ = (id) => document.getElementById(id);
+
+  // Build nodes with textContent so document data can never inject markup.
+  function node(tag, text, className) {
+    const el = document.createElement(tag);
+    if (text !== undefined) el.textContent = text;
+    if (className) el.className = className;
+    return el;
+  }
+
+  function applyChange(e) {
+    if (e.doc_id.startsWith('customer:') && e.op !== 'delete') {
+      customers.set(e.doc_id, e.body.name);
+    } else if (e.doc_id.startsWith('order:')) {
+      if (e.op === 'delete') orders.delete(e.doc_id);
+      else orders.set(e.doc_id, e.body);
+    }
+  }
+
+  function renderOrders() {
+    const body = $('orders');
+    body.replaceChildren();
+    const ids = [...orders.keys()].sort().reverse().slice(0, 25);
+    for (const id of ids) {
+      const o = orders.get(id);
+      const row = document.createElement('tr');
+      row.append(
+        node('td', id),
+        node('td', customers.get(o.customer_id) ?? o.customer_id ?? '—'),
+        node('td', o.status ?? '—'),
+        node('td', o.total !== undefined ? `$${Number(o.total).toFixed(2)}` : '—', 'num'),
+      );
+      body.append(row);
+    }
+    $('count').textContent = `(${orders.size})`;
+    $('no-orders').hidden = orders.size > 0;
+  }
+
+  function addEvent(e) {
+    const list = $('events');
+    const item = document.createElement('li');
+    item.append(
+      node('span', e.op, `badge ${e.op}`),
+      document.createTextNode(' '),
+      node('strong', e.doc_id),
+      node('div', `event ${e.event_id} · ${new Date(e.created_at).toLocaleTimeString()}`, 'meta'),
+    );
+    list.prepend(item);
+    while (list.children.length > MAX_EVENTS) list.lastElementChild.remove();
+  }
+
+  // The stream replays from event 0 on first connect, then resumes via Last-Event-ID on reconnect.
+  function connectFeed() {
+    const source = new EventSource(`${FEED_URL}/events/stream`);
+    source.onopen = () => { $('stream').textContent = 'Live: streaming from the change feed.'; };
+    source.onerror = () => { $('stream').textContent = 'Feed interrupted; reconnecting…'; };
+    source.addEventListener('change', (msg) => {
+      const e = JSON.parse(msg.data);
+      applyChange(e);
+      addEvent(e);
+      renderOrders();
+    });
+  }
+
+  async function pollAlerts() {
+    try {
+      const res = await fetch(`${ALERTS_URL}/alerts?limit=20`, { cache: 'no-store' });
+      const { alerts } = await res.json();
+      const list = $('alerts');
+      list.replaceChildren();
+      if (alerts.length === 0) list.append(node('li', 'No alerts yet.', 'empty'));
+      for (const a of alerts) {
+        const item = document.createElement('li');
+        item.append(node('span', a.rule, 'badge warn'), node('div', a.message), node('div', `event ${a.event_id}`, 'meta'));
+        list.append(item);
+      }
+      $('alerts-status').textContent = 'Alerts service: connected.';
+    } catch {
+      $('alerts-status').textContent = 'Alerts service unreachable; retrying.';
+    }
+  }
+
+  connectFeed();
+  pollAlerts();
+  setInterval(pollAlerts, 2000);
+</script>
+</body>
+</html>
