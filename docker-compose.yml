@@ -2,7 +2,7 @@ services:
   # Stands in for IBM Cloudant. The migrator talks to the same _changes API,
   # so pointing COUCH_URL at a Cloudant URL is the only change for production.
   couchdb:
-    image: couchdb:3.3
+    image: couchdb:3.5.2
     environment:
       COUCHDB_USER: admin
       COUCHDB_PASSWORD: admin
