@@ -6,7 +6,7 @@ Written for: the sales engineer or consultant running the demo live.
 
 ```sh
 docker compose up -d                       # CouchDB, Postgres, migrator
-docker compose run --rm migrator node dist/src/seed.js --count 500   # 50 customers, 500 orders
+docker compose exec migrator node dist/src/seed.js --count 500   # 50 customers, 500 orders
 docker compose exec postgres psql -U app -d showcase -f /sql/normalize.sql
 ```
 
@@ -33,7 +33,7 @@ Explain: "This is the migrator. It reads the source's change feed and writes eac
 Start the live writer in a second terminal:
 
 ```sh
-docker compose run --rm migrator node dist/src/seed.js --live
+docker compose exec migrator node dist/src/seed.js --live
 ```
 
 Watch the throughput rise. Every few seconds an order is shipped (an update) and every ten seconds one is deleted (a tombstone). Then in `psql`:
@@ -75,7 +75,7 @@ docker compose restart migrator
 Watch the log: the migrator resumes from the stored checkpoint, not from zero. Then:
 
 ```sh
-docker compose run --rm migrator node dist/src/verify-cli.js
+docker compose exec migrator node dist/src/verify-cli.js
 ```
 
 Expect exit 0 and `"ok": true` once the live writer is stopped (Ctrl+C in its terminal) and the dashboard shows **In sync**. Explain: "This is the gate before cutover. Mismatches while writes are running are expected, so the real check runs after the freeze."

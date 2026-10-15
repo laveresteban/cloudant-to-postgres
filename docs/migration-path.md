@@ -64,7 +64,7 @@ Exit criterion: `caughtUp` stays true under normal write load, and `lastError` i
 Goal: prove the Postgres copy matches the source before anything depends on it.
 
 ```sh
-npm run verify     # or: docker compose run --rm migrator node dist/src/verify-cli.js
+npm run verify     # or: docker compose exec migrator node dist/src/verify-cli.js
 ```
 
 The verify command:

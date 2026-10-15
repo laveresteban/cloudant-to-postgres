@@ -1,5 +1,7 @@
 # Cloudant / CouchDB to Postgres: showcase, live migrator, and change feed
 
+[![CI](https://github.com/laveresteban/cloudant-to-postgres/actions/workflows/ci.yml/badge.svg)](https://github.com/laveresteban/cloudant-to-postgres/actions/workflows/ci.yml)
+
 A kit for sales engineers and consultants discussing a move from IBM Cloudant (or CouchDB) to Postgres. It has these parts:
 
 1. **The case.** [docs/why-postgres.md](docs/why-postgres.md) covers the benefits and the honest trade-offs.
@@ -30,7 +32,7 @@ Requires Docker and Docker Compose. Stop any older stack first, because `init.sq
 
 ```sh
 docker compose up -d --build
-docker compose run --rm migrator node dist/src/seed.js --count 500
+docker compose exec migrator node dist/src/seed.js --count 500
 docker compose exec postgres psql -U app -d showcase -f /sql/normalize.sql
 ```
 
@@ -47,13 +49,13 @@ docker compose exec postgres psql -U app -d showcase -f /sql/normalize.sql
 Stream live changes while you watch the app:
 
 ```sh
-docker compose run --rm migrator node dist/src/seed.js --live
+docker compose exec migrator node dist/src/seed.js --live
 ```
 
 Check the copy (exit 0 means it matches):
 
 ```sh
-docker compose run --rm migrator node dist/src/verify-cli.js
+docker compose exec migrator node dist/src/verify-cli.js
 ```
 
 ## Deploy to AWS
@@ -72,7 +74,7 @@ This creates ECS Fargate services for the migrator and alerts, an RDS Postgres i
 docs/                       the value story, migration path and demo script
 db/normalize.sql            views and a materialized view that give the JSON a relational shape
 db/demo-queries.sql         the queries used in the demo
-migrator/                   streaming service (TypeScript, Node 24, runtime dependency: pg)
+migrator/                   streaming service (TypeScript, Node 22+, runtime dependency: pg)
   schema.sql                landing, checkpoint and change_events tables; applied on every start
   src/sync.ts               read a page after the checkpoint, apply it, repeat
   src/sink.ts               one transaction: rows + outbox events + checkpoint
@@ -86,6 +88,8 @@ services/alerts/            alerts microservice (TypeScript, own Dockerfile, own
   test/contract.test.ts     runs the real migrator feed server against the consumer
 deploy/aws/                 Terraform for ECS, RDS, ALB, Secrets Manager, S3
 docker-compose.yml          local stack: CouchDB, Postgres, migrator, alerts, app
+scripts/smoke.sh            end-to-end check of the running compose stack (used by CI)
+.github/workflows/ci.yml    tests, Terraform checks, compose smoke test, container images
 ```
 
 ## Configuration
@@ -122,12 +126,36 @@ cd services/alerts && npm install && npm test   # builds the migrator first; the
 
 The migrator tests cover the mapping, the sync loop and its backoff, the checkpoint and outbox transaction (with a fake client), the HTTP client's retries, the feed endpoints (JSON and SSE), the status server, verify, the seed generator, and the schema loader. The alerts tests cover the rules, the consumer loop, the store transaction, the HTTP API, and a contract test that runs the migrator's real feed server. None of these need Docker.
 
+End-to-end check of the local stack. It seeds, waits for `verify-cli` to pass, reads the feed, and runs both SQL files:
+
+```sh
+docker compose up -d --build --wait
+scripts/smoke.sh
+```
+
+## CI/CD
+
+[GitHub Actions](.github/workflows/ci.yml) runs on every push and pull request:
+
+| Job | What it checks |
+|---|---|
+| Unit tests | Both services on Node 22 and 24 |
+| Terraform | `fmt -check` and `validate` (no AWS credentials, no apply) |
+| Compose smoke test | `docker compose up`, then `scripts/smoke.sh` |
+| Images | Builds both Docker images. On `main` and `v*` tags, pushes them to `ghcr.io/laveresteban/cloudant-to-postgres/{migrator,alerts}` |
+
+CI does not deploy to AWS. Deploying is a manual step with `deploy/aws/deploy.sh`.
+
 ## Status and limits
 
-- Unit and contract tests pass: migrator 34, alerts 18.
-- Verified locally with Docker: the compose stack, both SQL files, the live seed, `verify-cli` (exit 0), and service restarts with no duplicate events or alerts.
+- CI runs the unit and contract tests, `terraform validate`, and a compose smoke test (seed, `verify-cli`, the feed, both SQL files) on every push.
+- Verified locally with Docker by hand: the live seed, and service restarts with no duplicate events or alerts.
 - Not run yet: an AWS apply. `terraform validate` passes. The browser app has been checked over HTTP only.
 - Not migrated: attachment bytes, design documents (write SQL instead), and conflicting revisions other than the winner.
 - One migrator per source database. Authentication is basic auth; Cloudant IAM is not implemented. Services talk over plain HTTP, and the feed has no auth, so it is a demo surface.
 - `change_events` has no retention yet, so it grows without limit.
 - The change feed stops at cutover, when the migrator stops. Post-cutover change capture is part of the migration plan, not built here.
+
+## License
+
+[MIT](LICENSE)

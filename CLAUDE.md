@@ -6,8 +6,11 @@ Sales-engineering kit (docs + demo stack), a streaming migrator from Cloudant/Co
 
 - `cd migrator && npm test`: builds to `dist/` and runs `node --test` on the compiled tests.
 - `cd services/alerts && npm test`: first builds the migrator (the contract test imports its compiled feed server), then runs its tests. Run the migrator's test first if the migrator changed.
-- Docker may not be running on the dev machine. Unit tests need no Docker. Docker checks (`docker compose up`, `seed.js`, `verify-cli.js`) and `deploy.sh` must be run by hand.
-- Terraform: `cd deploy/aws && terraform fmt -check && terraform validate`. Validate needs the providers. If the registry is unreachable, use a filesystem mirror (`TF_CLI_CONFIG_FILE`). Do not commit `.terraform/` or the lock file made from a mirror.
+- Scripted seeding must use `docker compose exec -T migrator ...`. `docker compose run` in a non-interactive shell left containers running after the process exited, so `seed.js --live` kept writing. Use `run` only interactively, with Ctrl+C to stop.
+- Docker may not be running on the dev machine. Unit tests need no Docker. `deploy.sh` must be run by hand.
+- `scripts/smoke.sh`: end-to-end check of a running compose stack (seed, wait for `verify-cli`, feed, both SQL files). It talks to services only via `docker compose exec`, so run it locally as a separate project, so it doesn't clash with the user's demo stack on the same ports or touch its volumes: `COMPOSE_PROJECT_NAME=c2p-smoke` plus an override with `ports: !reset []`, and `down -v` only that project. On Git Bash set `MSYS_NO_PATHCONV=1`, or `/sql/...` paths get mangled.
+- Terraform: `cd deploy/aws && terraform fmt -check && terraform validate`. Terraform is not installed locally; use `hashicorp/terraform:<ver>` in Docker, on a copy of the repo (from `git archive`), because `main.tf` reads `../../app`. Do not commit `.terraform/` or the lock file.
+- CI (`.github/workflows/ci.yml`): unit tests on Node 22 and 24, Terraform fmt/validate, the compose smoke test, then image builds. Images are pushed to GHCR (`ghcr.io/laveresteban/cloudant-to-postgres/{migrator,alerts}`) only on pushes to `main` and `v*` tags. The alerts job needs the migrator's `npm ci` to run first. CI never deploys to AWS.
 
 ## Code conventions
 
@@ -56,12 +59,13 @@ Sales-engineering kit (docs + demo stack), a streaming migrator from Cloudant/Co
 
 ## Unverified until run
 
-- Verified locally with Docker (compose up, seed, live writes, verify, restarts): the compose stack, `couchdb:3.3`, `postgres:16-alpine`, `nginx:1.27-alpine`, `db/normalize.sql`, `db/demo-queries.sql`, `migrator/schema.sql`, the upsert CTE (create/update/delete ops), and the `IS DISTINCT FROM` skip.
+- Verified locally with Docker (compose up, seed, live writes, verify, restarts): the compose stack, `couchdb:3.5.2` (checked after the bump from 3.3; the existing volume still read correctly), `postgres:16-alpine`, `nginx:1.27-alpine`, `db/normalize.sql`, `db/demo-queries.sql`, `migrator/schema.sql`, the upsert CTE (create/update/delete ops), and the `IS DISTINCT FROM` skip.
 - Not verified: AWS. The Terraform has passed `validate` only, and `deploy.sh` has not run against an AWS account.
 - The browser app has been checked only over HTTP (page, `config.js`, SSE). Its rendering has not been checked in a browser.
 - Say so in any summary that touches these.
 
 ## Git
 
-- The repo is local, branch `main`, with no remote yet and no commits yet. Do not commit or push unless asked.
+- Public repo: github.com/laveresteban/cloudant-to-postgres (MIT). Work on a branch and open a PR so CI runs. Do not commit or push unless asked.
+- `.gitattributes` forces LF. Shell scripts must keep the executable bit in git (`git add --chmod=+x`).
 - Commit messages end with the Co-Authored-By line from the session's attribution reminder.

@@ -83,4 +83,4 @@ This deletes the database, and no final snapshot is taken (`skip_final_snapshot 
 
 ## Validation status
 
-`terraform validate` passes against the AWS provider 5.70 and random 3.6. `terraform fmt -check` passes. The stack has not been applied to a real AWS account from this repo yet.
+`terraform fmt -check` and `terraform validate` run in CI on every push, with no credentials and no apply. The stack has not been applied to a real AWS account from this repo yet.
