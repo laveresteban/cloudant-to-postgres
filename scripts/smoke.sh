@@ -7,6 +7,7 @@
 # COMPOSE_PROJECT_NAME / COMPOSE_FILE and needs no published ports.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export MSYS_NO_PATHCONV=1  # Git Bash on Windows: keep /sql/... paths as-is. No effect elsewhere.
 
 dc() { docker compose "$@"; }
 # GET a URL from inside a service container and print the body (node's fetch; the images have no curl).

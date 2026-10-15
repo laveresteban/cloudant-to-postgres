@@ -153,4 +153,4 @@ After the rollback window closes and the reports match:
 - `change_events` (the outbox) grows without limit. Pruning consumed events is not built; add a retention job before running this for long.
 - The change feed stops at cutover because the migrator stops (see Phase 4). Post-cutover change capture is not built.
 - Consumers are at-least-once. The alerts service makes its writes idempotent with a primary key, but a new consumer must do the same.
-- The Terraform apply has not yet been run against AWS. The Docker stack has been run locally end-to-end against live CouchDB and Postgres. Run the demo once before a customer call.
+- The Terraform apply has not yet been run against AWS. The Docker stack has been run locally end-to-end against live CouchDB and Postgres, and CI runs a smoke test of it on every push. Run the demo once before a customer call.
