@@ -64,7 +64,7 @@ Exit criterion: `caughtUp` stays true under normal write load, and `lastError` i
 Goal: prove the Postgres copy matches the source before anything depends on it.
 
 ```sh
-npm run verify     # or: docker compose run --rm migrator node dist/src/verify-cli.js
+npm run verify     # or: docker compose exec migrator node dist/src/verify-cli.js
 ```
 
 The verify command:
@@ -153,4 +153,4 @@ After the rollback window closes and the reports match:
 - `change_events` (the outbox) grows without limit. Pruning consumed events is not built; add a retention job before running this for long.
 - The change feed stops at cutover because the migrator stops (see Phase 4). Post-cutover change capture is not built.
 - Consumers are at-least-once. The alerts service makes its writes idempotent with a primary key, but a new consumer must do the same.
-- The Terraform apply has not yet been run against AWS. The Docker stack has been run locally end-to-end against live CouchDB and Postgres. Run the demo once before a customer call.
+- The Terraform apply has not yet been run against AWS. The Docker stack has been run locally end-to-end against live CouchDB and Postgres, and CI runs a smoke test of it on every push. Run the demo once before a customer call.
